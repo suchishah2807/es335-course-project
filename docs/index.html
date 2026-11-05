@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPU Job Runtime and Failure</title>
+<meta name="description" content="ES 335 project: predicting runtime and failure of AI jobs on a shared GPU cluster (Alibaba PAI trace 2020), evaluated against per-user baselines with a time split.">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="page">
+<nav class="rail" aria-label="Sections">
+  <p class="brand">Runtime and failure of GPU cluster jobs<span>ES 335 course project</span></p>
+  <ol>
+    <li><a href="#question">Question</a></li>
+    <li><a href="#data">Data</a></li>
+    <li><a href="#preprocessing">Preprocessing</a></li>
+    <li><a href="#methods">Baselines and methods</a></li>
+    <li><a href="#evaluation">Evaluation design</a></li>
+    <li><a href="#results">Results</a></li>
+    <li><a href="#errors">Errors</a></li>
+    <li><a href="#limitations">Limitations</a></li>
+    <li><a href="#conclusion">Conclusion</a></li>
+    <li><a href="#reproduce">Reproduction</a></li>
+    <li><a class="extra" href="#team">Team, AI use, citations</a></li>
+  </ol>
+  <p class="rail-foot">Saanvi Mundra and Suchi Shah<br><a data-repo="" href="#reproduce">Source code</a> · <a data-repo="/blob/main/DECISIONS.md" href="#reproduce">Decision log</a></p>
+</nav>
+
+<main id="main">
+<!-- ================================================================ -->
+<section id="question" aria-labelledby="h-question">
+  <h1 id="h-question">Can a GPU cluster predict how long a job will run, and whether it will fail, from the request alone?</h1>
+  <p class="lede">We use one million jobs from Alibaba's production AI cluster to test whether a model that sees only what is known at submission beats the obvious rule: assume each user's next job behaves like their past ones.</p>
+  <p class="byline">Saanvi Mundra and Suchi Shah, for ES 335 Machine Learning (Prof. Udit Bhatia), November 2026</p>
+
+  <div class="headline" aria-label="Headline results on the test period, model versus per-user baseline">
+    <div class="hl-row">
+      <div class="hl-label"><b>Runtime error (MAE, log10 seconds)</b><span>lower is better · successful jobs</span>
+        <div class="hl-vals"><span class="m">model <span data-fill="rt-mae-m"></span></span> · <span class="b">baseline <span data-fill="rt-mae-b"></span></span><br>
+        difference <span data-fill="rt-diff"></span>, 95% CI <span data-fill="rt-diff-ci"></span></div></div>
+      <div class="hl-plot" id="hl-rt"></div>
+    </div>
+    <div class="hl-row">
+      <div class="hl-label"><b>Failure ranking (PR-AUC)</b><span>higher is better · no-skill = <span data-fill="fl-base"></span></span>
+        <div class="hl-vals"><span class="m">model <span data-fill="fl-pr-m"></span></span> · <span class="b">baseline <span data-fill="fl-pr-b"></span></span><br>
+        difference +<span data-fill="fl-diff"></span>, 95% CI <span data-fill="fl-diff-ci"></span></div></div>
+      <div class="hl-plot" id="hl-fl"></div>
+    </div>
+    <div class="hl-row">
+      <div class="hl-label"><b>Failure probability quality (Brier)</b><span>lower is better</span>
+        <div class="hl-vals"><span class="m">model <span data-fill="fl-brier-m"></span></span> · <span class="b">baseline <span data-fill="fl-brier-b"></span></span><br>
+        difference 95% CI <span data-fill="fl-brier-ci"></span></div></div>
+      <div class="hl-plot" id="hl-br"></div>
+    </div>
+  </div>
+  <div class="legend" aria-hidden="true"><span><i class="lm"></i>model</span><span><i class="lb"></i>per-user baseline</span></div>
+  <p class="note">Test period: the last 30% of the trace (days 56–69), scored once on <span data-fill="test-ran"></span> after every choice was frozen. Intervals resample users, not jobs. Sensitivity analysis (planned in advance): without the single heaviest user, 48% of finished test jobs, failure PR-AUC is 0.614 vs 0.475 at a base rate of 0.151. See <a href="#results">Results</a>.</p>
+
+  <div class="prose">
+    <h3>The question, precisely</h3>
+    <p>For a job submitted to a shared GPU cluster, using only information known at the moment of submission, can we predict</p>
+    <ol>
+      <li><strong>runtime</strong>: how long the job will run if it succeeds, in seconds (modelled as log10 seconds), and</li>
+      <li><strong>failure</strong>: whether it ends as Failed rather than Terminated (Alibaba's label for success),</li>
+    </ol>
+    <p>more accurately than a per-user baseline? And which information beyond the user's history (requested resources, task type, time of day) actually helps?</p>
+    <p><strong>One row is one job.</strong> The prediction is made at the job's submission timestamp. Inputs are limited to what the user asked for and what had already happened on the cluster: the requested CPU, memory and GPUs; the task roles; the requested GPU type; the hour and weekday; and the history of jobs by the same user or the same script group that had <em>finished</em> before this submission.</p>
+    <div class="callout limit"><p><strong>Limits of the claim.</strong> This is one production cluster over 69 days in mid-2020. The results describe shared-cluster ML jobs like these, not all GPU workloads. The models predict; they do not explain why jobs fail, and they are not a scheduling guarantee. Runtime is only defined for jobs that succeed (failed jobs almost never record an end time), so the runtime claim is "how long it runs if it works".</p></div>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<section id="data" aria-labelledby="h-data">
+  <h2 id="h-data"><span class="num">2</span>Data</h2>
+  <div class="prose">
+    <p>The <a href="https://github.com/alibaba/clusterdata/tree/master/cluster-trace-gpu-v2020">Alibaba PAI GPU cluster trace 2020</a> records jobs on a production cluster of more than 6,500 GPUs in July–August 2020 (Weng et al., NSDI '22). We use three of its tables: jobs (submit time, end time, status, user), tasks (each job's roles and requested CPU, memory and GPUs), and group tags (the requested GPU type and a hash of each job's script and parameters). We downloaded the official files and checked every SHA-256 checksum against Alibaba's README.</p>
+    <p>We re-derived every count rather than trusting the proposal. The trace has <strong>1,055,501 jobs</strong> from <strong>1,433 users</strong> over <strong>68.9 days</strong>: 732,355 Terminated, 256,555 Failed, 62,928 Running and 3,663 Waiting. Timestamps are shifted by a constant, but the README states that time of day and weekday (UTC+8) are preserved, so we use those and never the calendar date.</p>
+    <p><strong>Access and responsible use.</strong> There is no formal licence; the maintainers allow research and study use and ask for a citation. We do not redistribute the data. This site shows only derived results and a small sample of test jobs with re-numbered IDs.</p>
+  </div>
+
+  <h3>Quality checks that changed the project</h3>
+  <figure>
+    <img src="figures/01_runtime_label_by_status.png" alt="Bar chart: share of jobs whose every task records an end time, by status. Terminated 100%, Failed 0.4%, Running 0.4%, Waiting 0%." loading="lazy">
+    <figcaption><p class="takeaway">Only successful jobs have a measurable runtime, so the runtime model is scoped to them.</p>
+    Failed jobs record a task end time in 0.4% of cases (10% have a job-level end time). A runtime model trained on "jobs with an end time" would really be a model of successful jobs, so we say that openly instead.</figcaption>
+  </figure>
+  <figure>
+    <img src="figures/05_missingness_by_status.png" alt="Heatmap of the percentage of missing values by field and job status." loading="lazy">
+    <figcaption><p class="takeaway">Missing values depend on status, so missingness itself carries information.</p>
+    The requested GPU type (<code>gpu_type_spec</code>) is empty for 98% of jobs, meaning no type was requested. <code>plan_gpu</code> and <code>gpu_type</code> are missing together for 17% of tasks; <code>plan_gpu</code> has no zeros, so missing means "no GPU requested".
+    <details class="alt"><summary>Text version</summary><p>Terminated: plan_gpu 17%, gpu_type 17%, end_time 0%, gpu_type_spec 99% empty. Failed: plan_gpu 9%, end_time 90%. Running: plan_cpu 15%, plan_gpu 46%, end_time 99%. Waiting: plan_cpu 73%, start_time 54%, end_time 99%.</p></details></figcaption>
+  </figure>
+  <figure>
+    <img src="figures/04_runtime_distribution.png" alt="Histogram of log10 runtime in seconds for successful jobs, spanning about 1 second to several days." loading="lazy">
+    <figcaption><p class="takeaway">Runtime spans six orders of magnitude, so we model log10 seconds.</p>On a log scale an error of 0.3 means "off by a factor of 2" for any job length. Median 11 minutes, 90th percentile 3.6 hours.</figcaption>
+  </figure>
+  <figure>
+    <img src="figures/03_failure_rate_per_day.png" alt="Line chart of daily failure rate, ranging from about 9% to 77%, with spikes around days 31 and 59-60." loading="lazy">
+    <figcaption><p class="takeaway">The failure rate drifts across the trace, from 9% to 77% per day.</p>The spike on days 59–60 comes mostly from one user: 284,867 jobs in the trace (27% of all), 93% of their burst jobs failed. This falls in our test period. We kept the split rule fixed and report the effect openly (see <a href="#results">Results</a>).</figcaption>
+  </figure>
+  <figure>
+    <img src="figures/07_task_mix_by_week.png" alt="Stacked bars of task-type share by week." loading="lazy">
+    <figcaption><p class="takeaway">The workload mix also shifts week to week.</p>TensorFlow jobs are 53–72% of a week's jobs; distributed ps+worker jobs vary between 11% and 21%.</figcaption>
+  </figure>
+  <figure>
+    <img src="figures/08_jobs_per_user.png" alt="Cumulative share of jobs by users ranked by job count, rising steeply: the top 10 users account for 54% of jobs." loading="lazy">
+    <figcaption><p class="takeaway">A few users submit most jobs, so uncertainty is measured by resampling users.</p>Jobs from the same user are not independent. Treating 285,306 test jobs as independent would make every interval far too narrow.</figcaption>
+  </figure>
+  <div class="prose">
+    <p>Two more checks: the README describes a queue wait between job submission and the first task launch, but in this release that gap is exactly 0 seconds for every finished job, so queue wait cannot be studied. Running jobs are not concentrated at the end of the trace (4.2% of the last week's jobs vs 6.6% in the first 60 days), so they look like long-lived jobs rather than jobs cut off by the trace end; we drop them because their outcome is unknown.</p>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<section id="preprocessing" aria-labelledby="h-pre">
+  <h2 id="h-pre"><span class="num">3</span>Preprocessing</h2>
+  <div class="prose">
+    <p><strong>One row per job.</strong> A job can have up to four tasks (for example a parameter server and workers). We sum each task's requested CPU, memory and GPUs times its instance count, keep the per-instance maxima, and record the set of roles (22 distinct sets) and the main role (the task with the most GPUs). Row counts were checked after every join: 1,055,501 jobs in, 1,055,501 out. We drop the 3,663 Waiting jobs that have no submission time.</p>
+    <p><strong>History, without looking ahead.</strong> For each job we look up the same user's and the same script group's past jobs: how many had finished, their median runtime, their failure rate, and how many jobs the user submitted in the last hour. Only jobs whose outcome was known <em>before</em> this submission count. A job submitted earlier but still running tells us nothing yet. Failed jobs with no recorded end are treated as known 24 hours after submission, which is later than the true end for 97.2% of the failed jobs whose end we do know (the other 2.8% ran longer; see <a href="#limitations">Limitations</a>). We verified every history feature by brute force on 600 random job/key pairs: 0 mismatches.</p>
+    <p><strong>Learned steps use training rows only.</strong> The category lists (the 200 most frequent users plus an OTHER level), imputation medians, scaling and one-hot levels are fitted inside each model's <code>fit</code>, on that fold's training rows. Missing CPU or memory is left missing for the trees and median-imputed (with a missing flag) for the linear models.</p>
+  </div>
+
+  <h3>Leakage audit: every column, allowed or not</h3>
+  <div class="tbl-wrap" tabindex="0" role="region" aria-label="Scrollable table"><table id="leak-table"><caption>Each raw column, whether it is known at submission, and how we use it.</caption>
+    <thead><tr><th>table</th><th>column</th><th>known at submission?</th><th>used as</th><th>why</th></tr></thead><tbody></tbody></table></div>
+  <p class="prose">The assigned GPU type is the scheduler's decision, made after submission, so headline models use only the <em>requested</em> type. A separate sensitivity run shows what the leaked field would add: runtime MAE <span data-fill="leak-rt0"></span> → <span data-fill="leak-rt"></span>, failure PR-AUC <span data-fill="leak-fl0"></span> → <span data-fill="leak-fl"></span>.</p>
+
+  <div class="panel" id="walk" tabindex="0" aria-label="Interactive panel 1: how one prediction is made. Use the arrow keys to step.">
+    <div class="panel-head"><span class="pn">1</span><h3>How one prediction is made</h3></div>
+    <p class="intro">Step through a real test job, from the raw request to the comparison with what actually happened.</p>
+    <div class="stepbar"><button class="btn s-back" type="button">Back</button><button class="btn primary s-next" type="button">Next step</button>
+      <button class="btn s-play" type="button">Play</button><button class="btn s-reset" type="button">Reset</button><span class="status" aria-live="polite"></span></div>
+    <ol class="steps">
+      <li><h4>The request as submitted</h4><dl class="kv" id="w-req"></dl></li>
+      <li><h4>Leakage filter: only what is known at submission</h4><dl class="kv" id="w-leak"></dl></li>
+      <li><h4>History lookup: only jobs that had finished</h4><dl class="kv" id="w-hist"></dl></li>
+      <li><h4>Model prediction</h4><dl class="kv" id="w-pred"></dl></li>
+      <li><h4>Range: 5–95% quantiles, widened by the conformal offset</h4><dl class="kv" id="w-range"></dl></li>
+      <li><h4>Compare with the baseline and the truth</h4><dl class="kv" id="w-truth"></dl></li>
+    </ol>
+    <p class="note">Arrow keys step back and forward when this panel has focus.</p>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<section id="methods" aria-labelledby="h-methods">
+  <h2 id="h-methods"><span class="num">4</span>Baselines and methods</h2>
+  <div class="prose">
+    <h3>Baselines: the bar to beat</h3>
+    <p>Users repeat similar jobs, so the obvious rule is strong. For runtime, the <strong>per-user baseline</strong> predicts the user's median runtime over their previously finished successful jobs. For failure, it predicts the user's past failure rate. Both fall back to the training-set median or rate for users with no history. On the validation folds this baseline already reduced runtime error from 0.766 (global median) to 0.569, and raised failure PR-AUC from 0.194 (no skill) to 0.494. A smoothed per-user failure rate was tried and was no better.</p>
+    <h3>Methods</h3>
+    <p><strong>Ridge regression</strong> (runtime) and <strong>logistic regression</strong> (failure) are the simple references. They model the log-runtime, or the log-odds of failure, as a weighted sum of features with a penalty on large weights. They cannot capture interactions such as "GPU count matters more for distributed jobs" unless we add them by hand.</p>
+    <p><strong>Gradient-boosted trees</strong> (scikit-learn <code>HistGradientBoosting</code>) add many small decision trees in sequence, each correcting the previous ones. They handle mixed numeric and categorical inputs, missing values and interactions directly. For runtime we use absolute-error loss, which targets the median and so matches the MAE we report.</p>
+    <p><strong>Quantile trees</strong> predict the 5th and 95th percentiles of runtime, giving a range instead of a point. The raw ranges covered only 78–80% of validation-week jobs, against a 90% target. Following conformalised quantile regression, both ends are widened by an offset learned on the most recent validation week (0.18 log10, a factor of 1.5), which restored 88–91% coverage on the next week.</p>
+    <p><strong>Keep the complex model only if it clearly wins.</strong> A tree replaces its linear reference only if it is better by more than 0.02 on the mean over folds and on every fold. For runtime the tree won (fold MAE 0.300 vs 0.352 for ridge). For failure it did not: logistic regression scored 0.709, the planned tree grid 0.644–0.676 (worse as trees grew), and a more regularised tree 0.711. So the failure model is logistic regression. Under drift, flexible trees learn patterns of the training weeks that do not carry over.</p>
+  </div>
+  <div class="tbl-wrap" tabindex="0" role="region" aria-label="Scrollable table"><table id="cv-table"><caption>Every configuration tried, mean over the three walk-forward folds (development data only).</caption>
+    <thead><tr><th>task</th><th>configuration</th><th class="n">score</th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<!-- ================================================================ -->
+<section id="evaluation" aria-labelledby="h-eval">
+  <h2 id="h-eval"><span class="num">5</span>Evaluation design</h2>
+  <div class="prose">
+    <p><strong>Split by time, decided first.</strong> Jobs are ordered by submission. The earliest 70% (up to day 55.2) is development data, the next 24 hours are an embargo used by nothing, and the rest (days 56.2–68.9) is the test set. Development labels must be known by the start of the test period, as they would be for a model deployed then. The split was committed to the repository before any model was fitted.</p>
+    <p><strong>Tuning never sees the test set.</strong> All choices (features, models, hyperparameters, interval widening, threshold) were made on three walk-forward folds inside development: fit on everything before day 34, 41 or 48 and validate on the following week. The test set was scored exactly once, after the models were frozen; <code>results/test_run_log.json</code> records that run.</p>
+  </div>
+
+  <div class="panel" id="split" tabindex="0" aria-label="Interactive panel 2: why we split by time. Use the arrow keys to step.">
+    <div class="panel-head"><span class="pn">2</span><h3>Why we split by time</h3></div>
+    <p class="intro">Step through the timeline, then compare the same model scored with a random split.</p>
+    <div class="stepbar"><button class="btn s-back" type="button">Back</button><button class="btn primary s-next" type="button">Next step</button>
+      <button class="btn s-play" type="button">Play</button><button class="btn s-reset" type="button">Reset</button><span class="status" aria-live="polite"></span></div>
+    <p id="split-text" aria-live="polite"></p>
+    <div class="chart" id="split-chart"></div>
+    <h4>Random split versus time split</h4>
+    <div class="seg" id="split-toggle" role="group" aria-label="Split type"><button type="button" data-mode="time">time split</button><button type="button" data-mode="random">random split</button></div>
+    <div class="readouts">
+      <div class="readout m"><span class="k">Runtime MAE, model</span><b id="sd-rt"></b><span class="s">baseline <span id="sd-rt-b" class="mono"></span></span></div>
+      <div class="readout m"><span class="k">Failure PR-AUC, model</span><b id="sd-fl"></b><span class="s">baseline <span id="sd-fl-b" class="mono"></span></span></div>
+    </div>
+    <p id="sd-note" class="note" aria-live="polite"></p>
+    <div class="trythis"><p>Try this</p><ul><li>Switch to the random split and see the runtime error drop: the model looks better than it really is.</li>
+      <li>Step to the folds: each one validates on a week the model has not seen, like the test period.</li></ul></div>
+    <p class="note">This comparison uses development data only (fold 3's fit and validation weeks, reshuffled for the random version), so the test set stays untouched.</p>
+  </div>
+
+  <div class="prose">
+    <h3>How to read these metrics</h3>
+    <ul>
+      <li><strong>MAE on log10 seconds.</strong> The average size of a miss on a log scale. 10<sup>MAE</sup> is the typical error factor: an MAE of 0.30 means predictions are typically off by ×2.0 (too long or too short).</li>
+      <li><strong>RMSE</strong> squares misses before averaging, so it weighs the big misses more.</li>
+      <li><strong>Mean signed error</strong> keeps the sign: positive means the model predicts jobs as longer than they are. Drift usually shows up here first.</li>
+      <li><strong>Coverage</strong> is the share of jobs whose true runtime fell inside the predicted 5–95% range. It should be close to 90%.</li>
+      <li><strong>PR-AUC</strong> measures how well failures are ranked above successes. A model with no skill scores the failure base rate, not 0.5. Accuracy would be misleading: "never fails" is 74% accurate here.</li>
+      <li><strong>Brier score</strong> is the mean squared error of predicted probabilities; it rewards probabilities that are both sharp and honest. <strong>Calibration</strong> asks whether "30% risk" jobs fail about 30% of the time.</li>
+      <li><strong>95% confidence intervals</strong> come from a paired bootstrap that resamples users 1,000 times. "Paired" means the model and the baseline are scored on the same resampled jobs, so the interval is for their difference.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<section id="results" aria-labelledby="h-results">
+  <h2 id="h-results"><span class="num">6</span>Results</h2>
+  <div class="prose" id="results-text">
+    <p><strong>Runtime.</strong> On <span data-fill="rt-n"></span> successful test jobs, the tree's MAE is <span data-fill="rt-mae-m"></span> log10 s (a typical error factor of <span data-fill="rt-fac-m"></span>) against <span data-fill="rt-mae-b"></span> (<span data-fill="rt-fac-b"></span>) for the per-user baseline. The difference is <span data-fill="rt-diff"></span>, with a 95% interval of <span data-fill="rt-diff-ci"></span>. RMSE: <span data-fill="rt-rmse-m"></span> vs <span data-fill="rt-rmse-b"></span>. Ridge regression scores <span data-fill="rt-ridge"></span> and the global median <span data-fill="rt-global"></span>. The 5–95% range covers <span data-fill="rt-cov"></span> of test jobs (raw quantiles alone: <span data-fill="rt-cov-raw"></span>).</p>
+    <p><strong>Failure.</strong> On <span data-fill="fl-n"></span> finished test jobs (base rate <span data-fill="fl-base"></span>), logistic regression reaches PR-AUC <span data-fill="fl-pr-m"></span> against <span data-fill="fl-pr-b"></span> for the per-user failure rate (difference +<span data-fill="fl-diff"></span>, 95% interval <span data-fill="fl-diff-ci"></span>). Brier score <span data-fill="fl-brier-m"></span> vs <span data-fill="fl-brier-b"></span>; calibration error <span data-fill="fl-ece-m"></span> vs <span data-fill="fl-ece-b"></span>. At the threshold chosen on validation (<span data-fill="thr"></span>), alerts have precision <span data-fill="fl-prec"></span> and recall <span data-fill="fl-rec"></span>.</p>
+    <p id="results-interp"><strong>Reading these together.</strong> Both models clearly beat the per-user baselines, and the 95% intervals for the differences exclude zero. The runtime gain is the more stable of the two: a typical error of ×2.2 instead of ×4.0, and the model is closer than the baseline on 68% of jobs. The failure result needs care. The test period's failure rate (39.8%) is about double development's (20.4%), and 48% of the finished test jobs come from the single heaviest user, whose burst failures are easy to recognise from recent history. <strong>The main result is the full test set:</strong> PR-AUC 0.923 against 0.542 for the baseline, at a base rate of 0.398. A sensitivity analysis, planned before any model was fitted, splits that user out. Without them, PR-AUC is 0.614 against 0.475 at a base rate of 0.151 (difference 95% interval [+0.08, +0.19]). For that user alone it is 0.966 against 0.530 at a base rate of 0.667. The model beats the baseline in both groups, but the size of the gain depends heavily on this one user, which is also why the full-set interval is wide ([+0.09, +0.42]). The split was not changed, and the exclusion was never used to choose or tune any model.</p>
+    <p>Two comparisons with the simple references: the runtime tree beats ridge (0.338 vs 0.385; difference interval [−0.087, −0.022]). For failure, logistic regression was chosen on validation. On the test set the regularised tree we did not choose would have scored 0.938, slightly higher. We report it but did not switch, because changing models after seeing test results would turn the test set into a validation set.</p>
+  </div>
+
+  <div class="panel" id="try" aria-label="Interactive panel 3: try a job">
+    <div class="panel-head"><span class="pn">3</span><h3>Try a job</h3></div>
+    <p class="intro">Describe a job and read the final models' predictions. Every value comes from a grid precomputed with the actual test-time models; nothing is trained in your browser.</p>
+    <div class="controls"></div>
+    <div class="stepbar"><button class="btn" id="try-preset" type="button">Use a typical job</button></div>
+    <div class="readouts">
+      <div class="readout m"><span class="k">Predicted runtime, if it succeeds</span><b id="try-rt"></b><span class="s">5–95% range <span id="try-rng" class="mono"></span><br><span id="try-width"></span></span></div>
+      <div class="readout b"><span class="k">Baseline: user's past median</span><b id="try-rt-b"></b><span class="s">global median for a new user</span></div>
+      <div class="readout m"><span class="k">Failure risk</span><b id="try-pf"></b><span class="s" id="try-flag"></span></div>
+      <div class="readout b"><span class="k">Baseline: user's past failure rate</span><b id="try-pf-b"></b><span class="s">overall rate for a new user</span></div>
+    </div>
+    <svg id="try-bar" viewBox="0 0 640 56" role="img" aria-label="Predicted runtime range on a log time axis: shaded range, model point and baseline line"></svg>
+    <div class="legend"><span><i class="lr"></i>5–95% range</span><span><i class="lm"></i>model</span><span><i class="lb"></i>baseline</span></div>
+    <div class="trythis"><p>Try this</p><ul>
+      <li>Switch to a new user and watch the range widen: with no history the model leans on the request alone.</li>
+      <li>Raise the GPU count for a ps+worker job, then do the same for a Jupyter task.</li>
+      <li>Move the submit hour from 12:00 to 00:00 and see how little the time of day matters.</li></ul></div>
+    <p class="note">"Returning user" uses the median history of development-period users with history; individual users are never shown.</p>
+  </div>
+
+  <div class="panel" id="abl" tabindex="0" aria-label="Interactive panel 4: what each feature group adds. Use the arrow keys to step.">
+    <div class="panel-head"><span class="pn">4</span><h3>What each feature group adds</h3></div>
+    <p class="intro">Add feature groups one at a time. Each bar is a model refitted with the groups so far, scored on the test set; whiskers are 95% intervals for the difference from the baseline.</p>
+    <div class="stepbar"><button class="btn s-back" type="button">Back</button><button class="btn primary s-next" type="button">Next step</button>
+      <button class="btn s-play" type="button">Play</button><button class="btn s-reset" type="button">Reset</button><span class="status" aria-live="polite"></span></div>
+    <p id="abl-text" aria-live="polite"></p>
+    <div class="two-col even"><div class="chart" id="abl-rt"></div><div class="chart" id="abl-fl"></div></div>
+    <details class="alt"><summary>Table version</summary><div class="tbl-wrap" tabindex="0" role="region" aria-label="Scrollable table"><table id="abl-table"><thead><tr><th>features</th><th class="n">runtime MAE</th><th class="n">vs baseline, 95% CI</th><th class="n">failure PR-AUC</th><th class="n">vs baseline, 95% CI</th></tr></thead><tbody></tbody></table></div></details>
+    <p class="note">The ladder is order-dependent: each group's gain is measured given the groups before it.</p>
+  </div>
+
+  <div class="panel" id="time" aria-label="Interactive panel 5: does it hold up over time">
+    <div class="panel-head"><span class="pn">5</span><h3>Does it hold up over time?</h3></div>
+    <p class="intro">Error for each test day, model against baseline. Shaded strips mark the reporting bands.</p>
+    <div class="seg" id="time-toggle" role="group" aria-label="Metric"><button type="button" data-m="mae">runtime MAE</button><button type="button" data-m="mse">runtime bias</button><button type="button" data-m="pr">failure PR-AUC</button></div>
+    <div class="chart" id="time-chart"></div>
+    <div class="legend"><span><i class="lm"></i>model</span><span><i class="lb"></i>baseline</span></div>
+    <div class="tbl-wrap" tabindex="0" role="region" aria-label="Scrollable table"><table id="time-table"><caption>Per-band results on the test set.</caption><thead><tr><th>band</th><th class="n">runtime MAE</th><th class="n">baseline</th><th class="n">diff 95% CI</th><th class="n">signed error</th><th class="n">coverage</th><th class="n">failure PR-AUC</th><th class="n">baseline</th><th class="n">base rate</th></tr></thead><tbody></tbody></table></div>
+    <p id="time-interp" class="prose">The model beats the baseline in every band for both tasks; every runtime interval excludes zero. The errors are not flat, though. Runtime error rises in bands 2–3 (MAE 0.357 and 0.378, against 0.298 in band 1), the model starts to over-predict (signed error +0.10), and coverage slips to 86–88%. Failure PR-AUC falls from 0.92–0.98 in bands 1–2 to 0.51–0.58 in bands 3–4. That fall is mostly the base rate dropping from 44–59% to 15–19% (fewer failures make ranking harder), not the model breaking: it still beats the baseline there (0.582 vs 0.456, 0.507 vs 0.300) and its mean predicted risk tracks the observed rate (0.19 vs 0.19, 0.16 vs 0.15). In band 1 it under-predicts (0.33 vs 0.44), the same drift seen on the last validation fold.</p>
+  </div>
+
+  <div class="panel" id="thr" aria-label="Interactive panel 6: failure alert threshold">
+    <div class="panel-head"><span class="pn">6</span><h3>Choosing the failure alert threshold</h3></div>
+    <p class="intro">An alert could ask a user to check a job before it takes GPUs. Move the threshold to trade missed failures against false alarms.</p>
+    <div class="controls"><label class="ctl">Alert when risk is at least <span class="mono" id="thr-val"></span><input type="range" id="thr-slider"></label>
+      <button class="btn" id="thr-preset" type="button">Use the threshold chosen on validation</button></div>
+    <div class="readouts">
+      <div class="readout m"><span class="k">Precision: alerts that were real failures</span><b id="thr-prec"></b><span class="s">baseline <span id="thr-bprec" class="mono"></span></span></div>
+      <div class="readout m"><span class="k">Recall: failures that got an alert</span><b id="thr-rec"></b><span class="s">baseline <span id="thr-brec" class="mono"></span></span></div>
+      <div class="readout m"><span class="k">Jobs flagged</span><b id="thr-flag"></b><span class="s">requested GPUs flagged <span id="thr-gpu" class="mono"></span><br>GPUs of failed jobs caught <span id="thr-gcaught" class="mono"></span></span></div>
+      <div class="readout m"><span class="k">Cost per job (miss = 3, false alert = 1)</span><b id="thr-cost"></b><span class="s">baseline <span id="thr-bcost" class="mono"></span></span></div>
+    </div>
+    <div class="two-col"><div class="chart" id="thr-chart"></div><div><div class="chart" id="cal-chart"></div>
+      <div class="legend"><span><i class="lm"></i>model</span><span><i class="lb"></i>baseline</span><span>diagonal = perfectly calibrated</span></div></div></div>
+    <details class="alt"><summary>Calibration table</summary><div class="tbl-wrap" tabindex="0" role="region" aria-label="Scrollable table"><table id="cal-table"><thead><tr><th class="n">mean predicted</th><th class="n">observed failure rate</th><th class="n">jobs</th></tr></thead><tbody></tbody></table></div></details>
+    <div class="trythis"><p>Try this</p><ul><li>Push the threshold to 0.90: almost every alert is a real failure (99%), but fewer than half of the failures get one.</li><li>Lower it to 0.05: 98% of failures are caught, but 70% of all jobs are flagged and 45% of alerts are false.</li><li>Return to the chosen threshold and compare the cost per job with the baseline at the same threshold.</li></ul></div>
+  </div>
+
+  <h3>Seen and unseen users, and the heaviest-user sensitivity analysis</h3>
+  <div class="tbl-wrap" tabindex="0" role="region" aria-label="Scrollable table"><table id="slice-table"><caption>Test results by slice. "Seen" means the user appears in development data.</caption>
+    <thead><tr><th>slice</th><th class="n">runtime jobs</th><th class="n">runtime MAE</th><th class="n">baseline</th><th class="n">diff 95% CI</th><th class="n">coverage</th><th class="n">failure PR-AUC</th><th class="n">baseline</th><th class="n">base rate</th></tr></thead><tbody></tbody></table></div>
+  <p class="prose" id="slice-interp">Almost every test job comes from a user already seen in development, and from a user with some finished history, so the "new user" slices are small (1,797 and 93 runtime jobs) and their intervals are wide. The model's advantage shrinks there (0.350 vs 0.402 for unseen users) because the baseline's per-user signal is gone as well, but it still beats the fallback. The heaviest user is 26% of runtime test jobs and 48% of failure test jobs. Without them runtime MAE improves to 0.279 (baseline 0.514) and coverage is 94%. For them alone, coverage falls to 73%: their runtimes in the test weeks were harder to bound than anything in development.</p>
+</section>
+
+<!-- ================================================================ -->
+<section id="errors" aria-labelledby="h-errors">
+  <h2 id="h-errors"><span class="num">7</span>Errors</h2>
+  <div class="panel" id="exp" aria-label="Interactive panel 7: where it wins and loses">
+    <div class="panel-head"><span class="pn">7</span><h3>Where it wins and loses</h3></div>
+    <p class="intro">3,000 sampled test jobs (750 per band). Blue jobs are ones where the model was closer than the baseline; grey, where the baseline was closer. Click a job to see its inputs.</p>
+    <div class="controls">
+      <label class="ctl">Time band<select data-f="band"><option value="all">all</option><option value="1">band 1</option><option value="2">band 2</option><option value="3">band 3</option><option value="4">band 4</option></select></label>
+      <label class="ctl">Model beat baseline?<select data-f="beat"><option value="all">all</option><option value="yes">yes</option><option value="no">no</option></select></label>
+      <label class="ctl">User<select data-f="user"><option value="all">all</option><option value="seen">seen in development</option><option value="unseen">new in test period</option><option value="nohist">no finished history</option></select></label>
+      <label class="ctl">Requested GPU type<select data-f="gtype" id="exp-gtype"><option value="all">all</option></select></label>
+    </div>
+    <div class="controls"><label class="ctl">Job number (1–3000)<input type="number" id="exp-id" min="1" max="3000" value="1"></label>
+      <button class="btn" type="button" id="exp-show">Show job</button><button class="btn" type="button" id="exp-worst">Largest miss in this view</button></div>
+    <p class="note" id="exp-status" aria-live="polite"></p>
+    <div class="two-col"><div class="chart" id="exp-chart"></div><div id="exp-detail" aria-live="polite"><p class="note">Click a point to see the job's inputs, both predictions and the truth.</p></div></div>
+  </div>
+  <h3>Representative errors</h3>
+  <p class="prose">Cases were chosen by fixed rules in <code>src/error_analysis.py</code> (largest misses in each direction, typical misses, a user with no history, a rare explicit GPU type, a case where the baseline did much better, and the most confident failure mistakes), not by hand.</p>
+  <div class="cases" id="cases"></div>
+  <p class="prose" id="errors-interp"><strong>Patterns across the errors.</strong> The biggest misses are extreme jobs: very short successes (under 10 s, where the baseline is off by ×15 on average and the model by ×2.4) and very long ones (over 28 h, under-predicted by about ×13). Errors grow with job length beyond 3 hours, and the model systematically under-predicts the longest jobs: signed error −0.34 for 2.8–28 h. Jobs that request an explicit GPU type (about 1% of the test period) are predicted <em>worse</em> than by the baseline for P100, T4 and V100M32 requests. They are too rare in training for the model to learn their behaviour. By task type, the model wins everywhere; its largest error is on PyTorch jobs (0.59 vs 0.84 for the baseline).</p>
+</section>
+
+<!-- ================================================================ -->
+<section id="limitations" aria-labelledby="h-lim">
+  <h2 id="h-lim"><span class="num">8</span>Limitations</h2>
+  <div class="prose" id="limits">
+    <ul>
+      <li><strong>Runtime is conditional on success.</strong> Failed jobs almost never record an end time, so the runtime model learned only from jobs that worked. For a job that will fail, the runtime prediction says nothing; read it next to the failure risk.</li>
+      <li><strong>The test period is dominated by one user.</strong> The heaviest user accounts for 48% of finished test jobs and drives the failure surge in band 2. Much of the headline failure PR-AUC (0.923, base rate 0.398) comes from how recognisable that user's burst is. In the pre-planned sensitivity analysis without that user it is 0.614 (base rate 0.151), and on that user's own jobs 0.966 (base rate 0.667). On a cluster without such a user, expect gains closer to the sensitivity number. The user-level bootstrap makes this visible as a wide interval.</li>
+      <li><strong>Drift.</strong> The failure rate in the test weeks (40%) is twice that of development (20%). The runtime model over-predicts in bands 2–3 and its coverage slips below 90%. The models were trained once; a deployed version would need regular retraining and recalibration.</li>
+      <li><strong>One cluster, 69 days, mid-2020.</strong> Results may not transfer to other clusters, schedulers, hardware or years. The trace's dates are shifted, so we cannot relate events to the calendar.</li>
+      <li><strong>Dropped jobs.</strong> Running and Waiting jobs (6%) are excluded because their outcome is unknown. They look like long-lived jobs rather than jobs cut off by the trace end, but their absence probably makes the longest jobs under-represented.</li>
+      <li><strong>History timing assumption.</strong> Failed jobs without a recorded end (90% of failures) are treated as known 24 hours after submission. Among failed jobs that do record an end, 2.8% ran longer than 24 hours, so a few percent of failures may enter the history features shortly before they were truly known. We tested a 72-hour lag on the validation folds (development data only). Runtime error barely moved (0.2995 → 0.3040), but failure PR-AUC fell from 0.709 to 0.690, mostly in the burst-dominated last fold. The per-user baseline fell by a similar amount (0.494 → 0.469), so the model's advantage held (+0.215 → +0.221). The absolute failure score therefore depends partly on how quickly past failures become visible; the comparison with the baseline does not. The rule affects history features only, never labels or the split.</li>
+      <li><strong>Prediction, not causation.</strong> Features like "submissions in the last hour" predict failure because failing users resubmit; they do not cause failure. The models do not explain why jobs fail.</li>
+      <li><strong>Not a scheduling guarantee.</strong> We did not simulate a scheduler. A 90% range is a statement about many jobs, not a promise for one, and using these predictions to change scheduling would itself change user behaviour.</li>
+      <li><strong>Limited tuning.</strong> The hyperparameter grids were small (8 tree settings per task, plus 2 regularised failure trees), and the number of boosting rounds was not tuned.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="conclusion" aria-labelledby="h-conc">
+  <h2 id="h-conc"><span class="num">9</span>Conclusion</h2>
+  <div class="prose" id="conclusion-text">
+    <p>Using only information available at submission, both questions have a positive answer on this trace. A gradient-boosted tree predicts the runtime of successful jobs with a typical error of ×2.2, against ×4.0 for the user's past median, and the gain holds in every test band and for seen and unseen users alike. Logistic regression ranks failures far better than the user's past failure rate: PR-AUC 0.92 against 0.54 on the full test set (base rate 0.40). In the pre-planned sensitivity analysis without the dominant user, it is 0.61 against 0.48 (base rate 0.15). The gain holds in both, but its size depends strongly on that one user.</p>
+    <p>What helps is history, not the request. Requested resources and task type alone do not beat the per-user baseline for runtime (MAE 0.622 vs 0.601). Adding user and script-group history is what moves the error (to 0.352), and time of day adds a little more (0.338). The assigned GPU type, which we excluded as leakage, would add almost nothing on top.</p>
+    <p>The most useful lesson for us was about evaluation. A random split would have reported a runtime error of 0.20 instead of 0.33, so the time split is what made the result believable. Flexible trees lost to logistic regression for failure on validation, because they learned patterns from the training weeks that did not repeat. And the quantile ranges needed a conformal correction to come close to their promised 90% coverage. A modest and carefully bounded claim is what the evidence supports.</p>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<section id="reproduce" aria-labelledby="h-repro">
+  <h2 id="h-repro"><span class="num">10</span>Reproduction</h2>
+  <div class="prose">
+    <p>Everything runs from the public repository with Python 3.11+. The raw trace is downloaded by script and verified by checksum; it is never stored in the repository.</p>
+<pre tabindex="0" aria-label="Reproduction commands"><code>pip install -r requirements.txt
+python scripts/fetch_data.py
+cd src
+python load_raw.py
+python audit.py; python audit_plots.py
+python build_table.py        # one row per job + history features
+python leakage_table.py
+python split.py              # prints the frozen split (results/split.json)
+python baselines.py
+python runtime_models.py; python runtime_intervals.py
+python failure_models.py; python failure_tree_extra.py
+python final_test.py         # the single test run
+python split_demo.py; python drift_analysis.py; python error_analysis.py
+python export_site.py        # writes docs/data/</code></pre>
+    <p>The split is defined in <code>src/split.py</code> and frozen in <code>results/split.json</code>. All seeds are 335. We re-ran the whole pipeline from a fresh clone: every reported metric matched the committed results (<code>final_test.py --reproduce</code> compares and never overwrites them). Every decision, with the reason and the alternatives rejected, is in the <a data-repo="/blob/main/DECISIONS.md" href="#reproduce">decision log</a>.</p>
+  </div>
+</section>
+
+<section id="team" aria-labelledby="h-team">
+  <h2 id="h-team">Team and contributions</h2>
+  <div class="prose">
+    <p><strong>Shared:</strong> data fetch and audit, the one-row-per-job table, history features, the leakage audit, the split and evaluation design, baselines, the site and the README.</p>
+    <p><strong>Saanvi Mundra:</strong> the runtime task: ridge reference, gradient-boosted regressor, quantile range and its conformal correction, the seen/unseen-user study, the "Try a job" panel and the runtime results and errors.</p>
+    <p><strong>Suchi Shah:</strong> the failure task and the time-shift analysis: logistic reference, gradient-boosted classifier and its regularised extension, calibration, the alert threshold, the per-band drift analysis, the "Does it hold up over time" panel and the failure results and errors.</p>
+    <h3>AI-use disclosure</h3>
+    <p>We used Claude Code (Anthropic) as a coding assistant: writing and debugging scripts, drafting documentation and building this static site. Every modelling and evaluation decision is recorded with its reasoning in the decision log, and we checked the reported numbers against the code and data ourselves. We are responsible for all results.</p>
+    <h3>Citations</h3>
+    <ul>
+      <li>Q. Weng, W. Xiao, Y. Yu, W. Wang, C. Wang, J. He, Y. Li, L. Zhang, W. Lin, Y. Ding. <a href="https://www.usenix.org/conference/nsdi22/presentation/weng">MLaaS in the Wild: Workload Analysis and Scheduling in Large-Scale Heterogeneous GPU Clusters</a>. USENIX NSDI 2022. Data: <a href="https://github.com/alibaba/clusterdata">alibaba/clusterdata</a>.</li>
+      <li>F. Pedregosa et al. Scikit-learn: Machine Learning in Python. JMLR 12, 2011.</li>
+      <li>Y. Romano, E. Patterson, E. Candès. Conformalized Quantile Regression. NeurIPS 2019.</li>
+      <li>Fonts: Source Serif 4 (Adobe) and IBM Plex Mono (IBM), SIL Open Font License, served from this site. Charts are drawn with our own code; no external libraries are loaded.</li>
+    </ul>
+  </div>
+  <footer>Derived results only; the raw trace is not redistributed. Built as a static site for GitHub Pages.</footer>
+</section>
+</main>
+</div>
+<script src="data/site_metrics.js"></script>
+<script src="data/site_grid.js"></script>
+<script src="data/site_sample.js"></script>
+<script src="data/site_stepper.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
