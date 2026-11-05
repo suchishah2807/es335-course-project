@@ -1,0 +1,18 @@
+# Raw and intermediate data: never committed (Alibaba trace is not ours to re-host)
+/data/
+# Personal viva/contribution documents: never committed
+/personal/
+# Course context document (contains roll numbers)
+/context/
+# Caches
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.pytest_cache/
+.venv/
+venv/
+*.parquet
+.DS_Store
+Thumbs.db
+~$*
+/handoff/
