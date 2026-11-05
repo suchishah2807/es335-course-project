@@ -1,0 +1,23 @@
+{
+ "folds": [
+  {
+   "fold": 2,
+   "offset_from_fold": 1,
+   "offset_log10": 0.15462693780859021,
+   "coverage_raw": 0.8034351430064969,
+   "width_raw": 0.9419173051009525,
+   "coverage_cqr": 0.9074751698902248,
+   "width_cqr": 1.251171180718133
+  },
+  {
+   "fold": 3,
+   "offset_from_fold": 2,
+   "offset_log10": 0.12973471428245942,
+   "coverage_raw": 0.7847907078676309,
+   "width_raw": 1.0548499327682574,
+   "coverage_cqr": 0.8817663817663818,
+   "width_cqr": 1.3143193613331763
+  }
+ ],
+ "final_offset_from_fold3": 0.1833081101927648
+}
