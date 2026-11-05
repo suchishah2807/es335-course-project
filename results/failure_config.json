@@ -1,0 +1,18 @@
+{
+ "logit_C": 0.01,
+ "tree_params": {
+  "learning_rate": 0.05,
+  "max_leaf_nodes": 15,
+  "min_samples_leaf": 2000,
+  "l2_regularization": 1.0
+ },
+ "max_iter": 150,
+ "keep_tree": false,
+ "tree_beats_logit_every_fold": false,
+ "logit_mean_pr_auc": 0.7087903071719227,
+ "tree_mean_pr_auc": 0.7105051020482556,
+ "use_isotonic": false,
+ "threshold": 0.17,
+ "bayes_threshold": 0.25,
+ "tree_note": "tree_params = best tree over both grids (regularised extension); kept only as a comparator because it does not clearly beat logistic"
+}

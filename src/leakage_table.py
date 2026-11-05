@@ -1,0 +1,36 @@
+"""Phase 2: leakage table. Every raw column -> known at submission? -> used? -> why. Writes results/leakage_table.csv."""
+import pandas as pd
+
+from config import RESULTS, SITE_DATA
+
+ROWS = [
+    # table, column, known_at_submission, used_as, reason
+    ("job", "job_name", "yes", "key only", "Anonymised ID; joins job and task tables. No predictive meaning."),
+    ("job", "inst_id", "yes", "key only", "Job ID; joins the group tag table."),
+    ("job", "user", "yes", "feature (user_id, top-200 + OTHER) and history key", "Known at submission; past-only history per user."),
+    ("job", "status", "no", "label only", "Final outcome. Failed vs Terminated is the failure label; Running/Waiting dropped."),
+    ("job", "start_time", "yes", "prediction time; hour and weekday features; split key", "README: submission timestamp. UTC+8 time of day and weekday preserved; date is shifted."),
+    ("job", "end_time", "no", "label only (runtime) and history availability time", "Known only after the job ends."),
+    ("task", "task_name", "yes", "feature (main_role, role_set)", "Roles are declared in the submission (ps, worker, tensorflow...)."),
+    ("task", "inst_num", "yes", "feature (inst_total, n_tasks)", "Requested number of instances."),
+    ("task", "status", "no", "not used", "Task outcome; post-submission."),
+    ("task", "start_time", "no*", "runtime label only", "Task launch time. Equals job submit time for all finished jobs here, but conceptually post-scheduling."),
+    ("task", "end_time", "no", "runtime label only", "Known only after the task ends."),
+    ("task", "plan_cpu", "yes", "feature (cpu_total, cpu_per_inst_max)", "Requested CPU, part of the submission."),
+    ("task", "plan_mem", "yes", "feature (mem_total, mem_per_inst_max)", "Requested memory, part of the submission."),
+    ("task", "plan_gpu", "yes", "feature (gpu_total, gpu_per_inst_max, has_gpu_request)", "Requested GPU share. Missing = no GPU requested (no zeros exist)."),
+    ("task", "gpu_type", "no", "sensitivity run only (gpu_type_assigned)", "GPU type ASSIGNED by the scheduler after submission. Leakage for a pre-scheduling predictor."),
+    ("group_tag", "gpu_type_spec", "yes", "feature (with 'unspecified' level)", "GPU type REQUESTED by the user; empty for ~98% (no requirement)."),
+    ("group_tag", "group", "yes", "history key only (group_* features)", "Hash of submission inputs (script, params, data). 314k values: too many for a category."),
+    ("group_tag", "workload", "yes", "feature (with 'untagged' level)", "Tag derived from submission inputs; ~90% untagged."),
+    ("group_tag", "user", "yes", "not used (duplicate)", "Identical to job.user in 100% of matched rows."),
+    ("derived", "user_/group_ history (finished counts, fail rate, median log runtime)", "yes", "feature", "Built only from jobs that FINISHED strictly before this job's submission (failed without end time: known at submit + 24 h)."),
+    ("derived", "user_/group_ submission counts (all, last 1 h)", "yes", "feature", "Earlier SUBMISSIONS are visible to the scheduler immediately."),
+    ("derived", "queue wait", "n/a", "not used", "Always 0 in this release (job start = first task start)."),
+]
+
+if __name__ == "__main__":
+    t = pd.DataFrame(ROWS, columns=["table", "column", "known_at_submission", "used_as", "reason"])
+    t.to_csv(RESULTS / "leakage_table.csv", index=False)
+    t.to_json(SITE_DATA / "leakage_table.json", orient="records", indent=1)
+    print(t.to_string(index=False))

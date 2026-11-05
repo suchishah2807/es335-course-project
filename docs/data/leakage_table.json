@@ -1,0 +1,156 @@
+[
+ {
+  "table":"job",
+  "column":"job_name",
+  "known_at_submission":"yes",
+  "used_as":"key only",
+  "reason":"Anonymised ID; joins job and task tables. No predictive meaning."
+ },
+ {
+  "table":"job",
+  "column":"inst_id",
+  "known_at_submission":"yes",
+  "used_as":"key only",
+  "reason":"Job ID; joins the group tag table."
+ },
+ {
+  "table":"job",
+  "column":"user",
+  "known_at_submission":"yes",
+  "used_as":"feature (user_id, top-200 + OTHER) and history key",
+  "reason":"Known at submission; past-only history per user."
+ },
+ {
+  "table":"job",
+  "column":"status",
+  "known_at_submission":"no",
+  "used_as":"label only",
+  "reason":"Final outcome. Failed vs Terminated is the failure label; Running\/Waiting dropped."
+ },
+ {
+  "table":"job",
+  "column":"start_time",
+  "known_at_submission":"yes",
+  "used_as":"prediction time; hour and weekday features; split key",
+  "reason":"README: submission timestamp. UTC+8 time of day and weekday preserved; date is shifted."
+ },
+ {
+  "table":"job",
+  "column":"end_time",
+  "known_at_submission":"no",
+  "used_as":"label only (runtime) and history availability time",
+  "reason":"Known only after the job ends."
+ },
+ {
+  "table":"task",
+  "column":"task_name",
+  "known_at_submission":"yes",
+  "used_as":"feature (main_role, role_set)",
+  "reason":"Roles are declared in the submission (ps, worker, tensorflow...)."
+ },
+ {
+  "table":"task",
+  "column":"inst_num",
+  "known_at_submission":"yes",
+  "used_as":"feature (inst_total, n_tasks)",
+  "reason":"Requested number of instances."
+ },
+ {
+  "table":"task",
+  "column":"status",
+  "known_at_submission":"no",
+  "used_as":"not used",
+  "reason":"Task outcome; post-submission."
+ },
+ {
+  "table":"task",
+  "column":"start_time",
+  "known_at_submission":"no*",
+  "used_as":"runtime label only",
+  "reason":"Task launch time. Equals job submit time for all finished jobs here, but conceptually post-scheduling."
+ },
+ {
+  "table":"task",
+  "column":"end_time",
+  "known_at_submission":"no",
+  "used_as":"runtime label only",
+  "reason":"Known only after the task ends."
+ },
+ {
+  "table":"task",
+  "column":"plan_cpu",
+  "known_at_submission":"yes",
+  "used_as":"feature (cpu_total, cpu_per_inst_max)",
+  "reason":"Requested CPU, part of the submission."
+ },
+ {
+  "table":"task",
+  "column":"plan_mem",
+  "known_at_submission":"yes",
+  "used_as":"feature (mem_total, mem_per_inst_max)",
+  "reason":"Requested memory, part of the submission."
+ },
+ {
+  "table":"task",
+  "column":"plan_gpu",
+  "known_at_submission":"yes",
+  "used_as":"feature (gpu_total, gpu_per_inst_max, has_gpu_request)",
+  "reason":"Requested GPU share. Missing = no GPU requested (no zeros exist)."
+ },
+ {
+  "table":"task",
+  "column":"gpu_type",
+  "known_at_submission":"no",
+  "used_as":"sensitivity run only (gpu_type_assigned)",
+  "reason":"GPU type ASSIGNED by the scheduler after submission. Leakage for a pre-scheduling predictor."
+ },
+ {
+  "table":"group_tag",
+  "column":"gpu_type_spec",
+  "known_at_submission":"yes",
+  "used_as":"feature (with 'unspecified' level)",
+  "reason":"GPU type REQUESTED by the user; empty for ~98% (no requirement)."
+ },
+ {
+  "table":"group_tag",
+  "column":"group",
+  "known_at_submission":"yes",
+  "used_as":"history key only (group_* features)",
+  "reason":"Hash of submission inputs (script, params, data). 314k values: too many for a category."
+ },
+ {
+  "table":"group_tag",
+  "column":"workload",
+  "known_at_submission":"yes",
+  "used_as":"feature (with 'untagged' level)",
+  "reason":"Tag derived from submission inputs; ~90% untagged."
+ },
+ {
+  "table":"group_tag",
+  "column":"user",
+  "known_at_submission":"yes",
+  "used_as":"not used (duplicate)",
+  "reason":"Identical to job.user in 100% of matched rows."
+ },
+ {
+  "table":"derived",
+  "column":"user_\/group_ history (finished counts, fail rate, median log runtime)",
+  "known_at_submission":"yes",
+  "used_as":"feature",
+  "reason":"Built only from jobs that FINISHED strictly before this job's submission (failed without end time: known at submit + 24 h)."
+ },
+ {
+  "table":"derived",
+  "column":"user_\/group_ submission counts (all, last 1 h)",
+  "known_at_submission":"yes",
+  "used_as":"feature",
+  "reason":"Earlier SUBMISSIONS are visible to the scheduler immediately."
+ },
+ {
+  "table":"derived",
+  "column":"queue wait",
+  "known_at_submission":"n\/a",
+  "used_as":"not used",
+  "reason":"Always 0 in this release (job start = first task start)."
+ }
+]
