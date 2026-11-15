@@ -31,6 +31,7 @@ And which information (resources, task type, history, time of day) actually help
 | `src/split_demo.py` | Random vs time split on development data (site panel 2) |
 | `src/drift_analysis.py` | Per-day / per-band drift analysis (Suchi) |
 | `src/error_analysis.py` | Rule-based selection of representative errors |
+| `src/lag_sensitivity.py`, `src/failure_duration_check.py` | Extra experiments: the 72 h history rule, and how long failed jobs ran |
 | `src/export_site.py` | Small derived data files for the website (`docs/data/`) |
 | `scripts/build_notebooks.py` | Builds the three walk-through notebooks from saved results |
 | `notebooks/` | Readable walk-throughs of the audit, runtime and failure results |
@@ -57,6 +58,7 @@ python failure_models.py            # walk-forward tuning only (~30 min)
 python failure_tree_extra.py        # regularised-tree extension on folds
 python final_test.py --reproduce    # reruns the frozen test pipeline and compares with results/final_metrics.json
 python split_demo.py && python drift_analysis.py && python error_analysis.py
+python lag_sensitivity.py && python failure_duration_check.py   # extra experiments
 python export_site.py               # writes docs/data/site_*.js
 cd .. && python scripts/build_notebooks.py && jupyter nbconvert --to notebook --execute --inplace notebooks/*.ipynb
 ```
@@ -68,7 +70,7 @@ The whole pipeline takes about 1.5 hours on our laptop (18 CPU threads). Close o
 
 Then open `docs/index.html` (or serve it: `python -m http.server -d docs 8000`).
 
-**Where the split is defined:** `src/split.py` → `results/split.json` (frozen 2026-11-04 13:51 UTC, commit `51e686b`, before any model was fit).
+**Where the split is defined:** `src/split.py` → `results/split.json` (frozen 2026-11-04 13:51 UTC, see `frozen_at_utc` in `results/split.json`, before any model was fit; commit hashes in `DECISIONS.md` refer to our local working repository before it was published).
 Earliest 70% of jobs by submit time = development; 24 h embargo; the rest = test. All tuning uses three walk-forward folds inside development.
 
 **Seeds:** `SEED = 335` everywhere (`src/config.py`).
@@ -82,9 +84,7 @@ with re-numbered (anonymised) identifiers.
 
 ## AI-use disclosure
 
-We used Claude Code (Anthropic) as a coding assistant for writing and debugging scripts, drafting documentation,
-and building the static site. All modelling decisions, the evaluation design and every reported number were checked
-by us against the code and the data; the reasoning is recorded in `DECISIONS.md`. We are responsible for all results.
+We used Claude Code (Anthropic) as a coding assistant for writing and debugging scripts and for building the website, and for guidance, calculations and checking numbers. All brainstorming, ideas, modelling decisions, evaluation design and conclusions are our own, and we checked every reported number against the code and the data. We are responsible for all results. The reasoning is recorded in `DECISIONS.md`.
 
 ## Citations
 
@@ -92,3 +92,9 @@ by us against the code and the data; the reasoning is recorded in `DECISIONS.md`
   Analysis and Scheduling in Large-Scale Heterogeneous GPU Clusters.* USENIX NSDI 2022.
 - F. Pedregosa et al. *Scikit-learn: Machine Learning in Python.* JMLR 12, 2011.
 - pandas, NumPy, Matplotlib (data handling and figures).
+- - J. H. Friedman. *Greedy function approximation: a gradient boosting machine.* Annals of Statistics 29(5), 2001.
+- G. Ke et al. *LightGBM: A Highly Efficient Gradient Boosting Decision Tree.* NeurIPS 2017.
+- D. C. Liu and J. Nocedal. *On the limited memory BFGS method for large scale optimization.* Mathematical Programming 45, 1989.
+- Y. Romano, E. Patterson, E. J. Candès. *Conformalized Quantile Regression.* NeurIPS 2019 (arXiv:1905.03222).
+- scikit-learn documentation: `HistGradientBoostingRegressor` and `LogisticRegression`.
+- Instrument Serif and Geist fonts (SIL Open Font License), loaded from Google Fonts on the website.
