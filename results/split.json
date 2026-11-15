@@ -1,0 +1,98 @@
+{
+ "frozen_at_utc": "2026-11-04T13:51:54+00:00",
+ "t0": 494319.0,
+ "cut": 5259970.6,
+ "gap_s": 86400,
+ "test_from": 5346370.6,
+ "trace_end": 6451081.0,
+ "cut_day": 55.15800462962962,
+ "test_from_day": 56.15800462962962,
+ "trace_end_day": 68.94400462962963,
+ "folds": [
+  {
+   "fold": 1,
+   "fit_submit_before": 3431919.0,
+   "fit_known_before": 3518319.0,
+   "val_from": 3518319.0,
+   "val_to": 4036719.0
+  },
+  {
+   "fold": 2,
+   "fit_submit_before": 4036719.0,
+   "fit_known_before": 4123119.0,
+   "val_from": 4123119.0,
+   "val_to": 4641519.0
+  },
+  {
+   "fold": 3,
+   "fit_submit_before": 4641519.0,
+   "fit_known_before": 4727919.0,
+   "val_from": 4727919.0,
+   "val_to": 5259970.6
+  }
+ ],
+ "band_edges": [
+  5346370.6,
+  5622548.449999999,
+  5898726.3,
+  6174904.15,
+  6451082.0
+ ],
+ "band_edges_day": [
+  56.15800462962962,
+  59.354507523148136,
+  62.551010416666664,
+  65.74751331018518,
+  68.9440162037037
+ ],
+ "counts": {
+  "dev": {
+   "jobs": 736209,
+   "failure_labelled": 685529,
+   "runtime_labelled": 545646
+  },
+  "late_label": {
+   "jobs": 77,
+   "failure_labelled": 77,
+   "runtime_labelled": 58
+  },
+  "embargo": {
+   "jobs": 19654,
+   "failure_labelled": 17998,
+   "runtime_labelled": 14979
+  },
+  "test": {
+   "jobs": 295898,
+   "failure_labelled": 285306,
+   "runtime_labelled": 171672
+  }
+ },
+ "late_label_runtime_dropped": 58,
+ "test_band_counts": {
+  "1": 78289,
+  "2": 103063,
+  "3": 57941,
+  "4": 46013
+ },
+ "fold_counts": [
+  {
+   "fold": 1,
+   "fit_failure_labelled": 366724,
+   "val_failure_labelled": 77779,
+   "val_runtime_labelled": 66880
+  },
+  {
+   "fold": 2,
+   "fit_failure_labelled": 462537,
+   "val_failure_labelled": 84975,
+   "val_runtime_labelled": 66955
+  },
+  {
+   "fold": 3,
+   "fit_failure_labelled": 562121,
+   "val_failure_labelled": 106832,
+   "val_runtime_labelled": 82134
+  }
+ ],
+ "test_unseen_user_share_%": 1.45
+}

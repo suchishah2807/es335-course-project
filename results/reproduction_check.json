@@ -1,0 +1,48 @@
+{
+ "date": "2026-11-04",
+ "how": "fresh git clone; scripts in README order; src/final_test.py --reproduce",
+ "numbers_compared": 1666,
+ "identical_within_0.0005": 1661,
+ "differences": [
+  {
+   "path": "/failure/tree/pr_auc",
+   "committed": 0.938299230452729,
+   "reproduced": 0.9375893933556446
+  },
+  {
+   "path": "/failure/tree/roc_auc",
+   "committed": 0.9442336796196954,
+   "reproduced": 0.9434131361625318
+  },
+  {
+   "path": "/failure/tree/brier",
+   "committed": 0.08892508881251933,
+   "reproduced": 0.08605204568680352
+  },
+  {
+   "path": "/failure/tree/mean_pred",
+   "committed": 0.33344342704648344,
+   "reproduced": 0.3370337227889704
+  },
+  {
+   "path": "/failure/tree/ece",
+   "committed": 0.06484472672525637,
+   "reproduced": 0.06125443098276936
+  }
+ ],
+ "headline": {
+  "runtime_mae": [
+   0.33817906015914145,
+   0.33817906015914145
+  ],
+  "failure_pr_auc": [
+   0.9227833206459722,
+   0.9227833206459722
+  ],
+  "failure_brier": [
+   0.09732442894008397,
+   0.09732442894008397
+  ]
+ },
+ "note": "All differences are the unchosen comparator tree, fitted in the clone with the pre-fix config; failure_tree_extra.py now writes that config, and a re-run in the clone gives an identical failure_config.json."
+}

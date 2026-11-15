@@ -1,0 +1,49 @@
+{
+ "status": "completed",
+ "ran_at_utc": "2026-11-04T15:12:41+00:00",
+ "attempts": [
+  {
+   "started_utc": "2026-11-04T14:56:18+00:00",
+   "git_commit": "1f1593b"
+  }
+ ],
+ "completed_runs": 1,
+ "runtime_model": "tree",
+ "failure_model": "logistic",
+ "runtime_config": {
+  "ridge_alpha": 10,
+  "tree_params": {
+   "loss": "absolute_error",
+   "learning_rate": 0.1,
+   "max_leaf_nodes": 127,
+   "min_samples_leaf": 100
+  },
+  "max_iter": 300,
+  "keep_tree": true,
+  "tree_beats_ridge_every_fold": true,
+  "ridge_mean_mae": 0.35214465778242393,
+  "tree_mean_mae": 0.2995250894978139,
+  "quantile_mean_coverage": 0.7881082489793635,
+  "use_cqr": true,
+  "cqr_offset_log10": 0.1833081101927648
+ },
+ "failure_config": {
+  "logit_C": 0.01,
+  "tree_params": {
+   "learning_rate": 0.05,
+   "max_leaf_nodes": 15,
+   "min_samples_leaf": 2000,
+   "l2_regularization": 1.0
+  },
+  "max_iter": 150,
+  "keep_tree": false,
+  "tree_beats_logit_every_fold": false,
+  "logit_mean_pr_auc": 0.7087903071719227,
+  "tree_mean_pr_auc": 0.7105051020482556,
+  "use_isotonic": false,
+  "threshold": 0.17,
+  "bayes_threshold": 0.25,
+  "tree_note": "tree_params = best tree over both grids (regularised extension); kept only as a comparator because it does not clearly beat logistic"
+ },
+ "seconds": 983
+}
