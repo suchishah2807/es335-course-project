@@ -1,0 +1,95 @@
+{
+ "y_logrt": {
+  "time_split": {
+   "model": {
+    "n": 82134,
+    "mae": 0.3314350392500326,
+    "rmse": 0.5427494933182397,
+    "mean_signed_error": -0.07241431114681153,
+    "median_abs_error": 0.17169389622163855,
+    "error_factor": 2.1450382420294676
+   },
+   "baseline": {
+    "n": 82134,
+    "mae": 0.5826360550448944,
+    "rmse": 0.8038584444012697,
+    "mean_signed_error": 0.021345635517693688,
+    "median_abs_error": 0.4191508940276887,
+    "error_factor": 3.8250406512019173
+   }
+  },
+  "random_split": {
+   "model": {
+    "n": 82548,
+    "mae": 0.20311755493671374,
+    "rmse": 0.37836009087897543,
+    "mean_signed_error": -0.03870649375047065,
+    "median_abs_error": 0.08746315992150677,
+    "error_factor": 1.596311178663662
+   },
+   "baseline": {
+    "n": 82548,
+    "mae": 0.5532720019942877,
+    "rmse": 0.771572882266829,
+    "mean_signed_error": 0.015776146749144276,
+    "median_abs_error": 0.38434271806801723,
+    "error_factor": 3.574966709815945
+   }
+  },
+  "n_fit_time": 448817,
+  "n_val_time": 82134,
+  "n_fit_random": 448403,
+  "n_val_random": 82548
+ },
+ "y_fail": {
+  "time_split": {
+   "model": {
+    "n": 106832,
+    "base_rate": 0.2311854126104538,
+    "pr_auc": 0.7018699634389316,
+    "roc_auc": 0.8695181994564173,
+    "brier": 0.10724714644457489,
+    "brier_base": 0.17773871760658805,
+    "mean_pred": 0.18913420908500703,
+    "ece": 0.04405792581351602
+   },
+   "baseline": {
+    "n": 106832,
+    "base_rate": 0.2311854126104538,
+    "pr_auc": 0.4245709745698192,
+    "roc_auc": 0.7161848790584603,
+    "brier": 0.16207798624392536,
+    "brier_base": 0.17773871760658805,
+    "mean_pred": 0.1601584312143758,
+    "ece": 0.07842733583458401
+   }
+  },
+  "random_split": {
+   "model": {
+    "n": 106690,
+    "base_rate": 0.20615802793139001,
+    "pr_auc": 0.8378056779518295,
+    "roc_auc": 0.933023368112753,
+    "brier": 0.07354617268798327,
+    "brier_base": 0.1636568954508302,
+    "mean_pred": 0.20665127453847482,
+    "ece": 0.008032210796745697
+   },
+   "baseline": {
+    "n": 106690,
+    "base_rate": 0.20615802793139001,
+    "pr_auc": 0.5251028899321021,
+    "roc_auc": 0.7900247029238985,
+    "brier": 0.13402135497544343,
+    "brier_base": 0.1636568954508302,
+    "mean_pred": 0.17134846200506984,
+    "ece": 0.053285162619810464
+   }
+  },
+  "n_fit_time": 562121,
+  "n_val_time": 106832,
+  "n_fit_random": 562263,
+  "n_val_random": 106690
+ },
+ "note": "Random split: rows from the fold-3 fit and validation windows shuffled together; validation size kept. Note that history features are time-safe in both cases; the inflation comes from same-period jobs, bursts and repeated scripts appearing on both sides."
+}

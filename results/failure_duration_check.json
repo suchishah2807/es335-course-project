@@ -1,0 +1,30 @@
+{
+ "failed_jobs": 256555,
+ "with_end_time": 25620,
+ "with_end_time_%": 9.99,
+ "share_longer_than_%": {
+  "1h": 14.07,
+  "6h": 6.38,
+  "12h": 4.22,
+  "24h": 2.77,
+  "48h": 1.33,
+  "72h": 0.92
+ },
+ "count_longer_than": {
+  "1h": 3606,
+  "6h": 1635,
+  "12h": 1080,
+  "24h": 710,
+  "48h": 342,
+  "72h": 235
+ },
+ "duration_quantiles_h": {
+  "0.5": 0.06,
+  "0.9": 2.26,
+  "0.95": 8.95,
+  "0.99": 61.25
+ },
+ "heavy_user_share_with_end_%": 0.05,
+ "heavy_user_share_without_end_%": 53.84,
+ "longer_than_24h_excluding_heavy_user_%": 2.77
+}
