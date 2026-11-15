@@ -1,0 +1,17 @@
+{
+ "ridge_alpha": 10,
+ "tree_params": {
+  "loss": "absolute_error",
+  "learning_rate": 0.1,
+  "max_leaf_nodes": 127,
+  "min_samples_leaf": 100
+ },
+ "max_iter": 300,
+ "keep_tree": true,
+ "tree_beats_ridge_every_fold": true,
+ "ridge_mean_mae": 0.35214465778242393,
+ "tree_mean_mae": 0.2995250894978139,
+ "quantile_mean_coverage": 0.7881082489793635,
+ "use_cqr": true,
+ "cqr_offset_log10": 0.1833081101927648
+}
