@@ -1,0 +1,69 @@
+{
+ "note": "Sensitivity of the 24 h history rule (development data only; the test set is not scored).",
+ "lags": {
+  "24h": {
+   "folds": [
+    {
+     "fold": 1,
+     "runtime_mae": 0.2744962430857918,
+     "runtime_baseline_mae": 0.5539791336077499,
+     "failure_pr_auc": 0.62486147167333,
+     "failure_baseline_pr_auc": 0.4420752543762532
+    },
+    {
+     "fold": 2,
+     "runtime_mae": 0.2926439861576174,
+     "runtime_baseline_mae": 0.5711897732080163,
+     "failure_pr_auc": 0.7740936348096394,
+     "failure_baseline_pr_auc": 0.6150648510905963
+    },
+    {
+     "fold": 3,
+     "runtime_mae": 0.3314350392500326,
+     "runtime_baseline_mae": 0.5826360550448944,
+     "failure_pr_auc": 0.7274158150327985,
+     "failure_baseline_pr_auc": 0.4245709745698192
+    }
+   ],
+   "mean_runtime_mae": 0.2995250894978139,
+   "mean_runtime_baseline_mae": 0.5692683206202201,
+   "mean_failure_pr_auc": 0.7087903071719227,
+   "mean_failure_baseline_pr_auc": 0.4939036933455562
+  },
+  "72h": {
+   "folds": [
+    {
+     "fold": 1,
+     "runtime_mae": 0.2758055227766155,
+     "runtime_baseline_mae": 0.5539791336077499,
+     "failure_pr_auc": 0.6406243225908154,
+     "failure_baseline_pr_auc": 0.4310091015869351
+    },
+    {
+     "fold": 2,
+     "runtime_mae": 0.2982929537506237,
+     "runtime_baseline_mae": 0.5711897732080163,
+     "failure_pr_auc": 0.7813126669010542,
+     "failure_baseline_pr_auc": 0.6393382203735769
+    },
+    {
+     "fold": 3,
+     "runtime_mae": 0.3380255605270657,
+     "runtime_baseline_mae": 0.5826360550448944,
+     "failure_pr_auc": 0.6473765026110849,
+     "failure_baseline_pr_auc": 0.3365862977914734
+    }
+   ],
+   "mean_runtime_mae": 0.3040413456847683,
+   "mean_runtime_baseline_mae": 0.5692683206202201,
+   "mean_failure_pr_auc": 0.689771164034318,
+   "mean_failure_baseline_pr_auc": 0.46897787325066176
+  }
+ },
+ "change_72_minus_24": {
+  "mean_runtime_mae": 0.004516256186954393,
+  "mean_runtime_baseline_mae": 0.0,
+  "mean_failure_pr_auc": -0.019019143137604666,
+  "mean_failure_baseline_pr_auc": -0.02492582009489447
+ }
+}

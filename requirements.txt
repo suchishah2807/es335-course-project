@@ -1,0 +1,8 @@
+pandas==2.3.2
+numpy==2.3.2
+scikit-learn==1.7.1
+matplotlib==3.10.5
+pyarrow>=17
+nbformat>=5.9
+nbconvert>=7.0
+ipykernel>=6.0
