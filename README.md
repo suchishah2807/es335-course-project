@@ -6,7 +6,7 @@ ES 335 (Machine Learning, Prof. Udit Bhatia) course project by **Saanvi Mundra**
 (a) how long it will run if it succeeds and (b) whether it will fail, better than simple per-user baselines?
 And which information (resources, task type, history, time of day) actually helps?
 
-- Live site: `- Live site: https://suchishah2807.github.io/es335-course-project/` (GitHub Pages from `main` / `docs`)
+- Live site: <https://suchishah2807.github.io/es335-course-project/> (GitHub Pages from main / docs)
 - Decision log: [`DECISIONS.md`](DECISIONS.md)
 - Data: Alibaba PAI GPU cluster trace 2020 (Weng et al., NSDI '22). **Not redistributed here**; fetched by script.
 
@@ -70,7 +70,7 @@ The whole pipeline takes about 1.5 hours on our laptop (18 CPU threads). Close o
 
 Then open `docs/index.html` (or serve it: `python -m http.server -d docs 8000`).
 
-**Where the split is defined:** `src/split.py` → `results/split.json` (frozen 2026-11-04 13:51 UTC, see `frozen_at_utc` in `results/split.json`, before any model was fit; commit hashes in `DECISIONS.md` refer to our local working repository before it was published).
+**Where the split is defined:** `src/split.py` → `results/split.json` (frozen 2026-11-04 13:51 UTC, see `frozen_at_utc` in `results/split.json`, before any model was fit).
 Earliest 70% of jobs by submit time = development; 24 h embargo; the rest = test. All tuning uses three walk-forward folds inside development.
 
 **Seeds:** `SEED = 335` everywhere (`src/config.py`).
@@ -92,7 +92,7 @@ We used an AI assistant (Claude, by Anthropic) for guidance, calculations, verif
   Analysis and Scheduling in Large-Scale Heterogeneous GPU Clusters.* USENIX NSDI 2022.
 - F. Pedregosa et al. *Scikit-learn: Machine Learning in Python.* JMLR 12, 2011.
 - pandas, NumPy, Matplotlib (data handling and figures).
-- - J. H. Friedman. *Greedy function approximation: a gradient boosting machine.* Annals of Statistics 29(5), 2001.
+- J. H. Friedman. *Greedy function approximation: a gradient boosting machine.* Annals of Statistics 29(5), 2001.
 - G. Ke et al. *LightGBM: A Highly Efficient Gradient Boosting Decision Tree.* NeurIPS 2017.
 - D. C. Liu and J. Nocedal. *On the limited memory BFGS method for large scale optimization.* Mathematical Programming 45, 1989.
 - Y. Romano, E. Patterson, E. J. Candès. *Conformalized Quantile Regression.* NeurIPS 2019 (arXiv:1905.03222).
