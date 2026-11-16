@@ -6,7 +6,7 @@ ES 335 (Machine Learning, Prof. Udit Bhatia) course project by **Saanvi Mundra**
 (a) how long it will run if it succeeds and (b) whether it will fail, better than simple per-user baselines?
 And which information (resources, task type, history, time of day) actually helps?
 
-- Live site: `https://<repo-owner>.github.io/ES335-gpu-job-prediction/` (GitHub Pages from `main` / `docs`)
+- Live site: `- Live site: https://suchishah2807.github.io/es335-course-project/` (GitHub Pages from `main` / `docs`)
 - Decision log: [`DECISIONS.md`](DECISIONS.md)
 - Data: Alibaba PAI GPU cluster trace 2020 (Weng et al., NSDI '22). **Not redistributed here**; fetched by script.
 
@@ -84,7 +84,7 @@ with re-numbered (anonymised) identifiers.
 
 ## AI-use disclosure
 
-We used Claude Code (Anthropic) as a coding assistant for writing and debugging scripts and for building the website, and for guidance, calculations and checking numbers. All brainstorming, ideas, modelling decisions, evaluation design and conclusions are our own, and we checked every reported number against the code and the data. We are responsible for all results. The reasoning is recorded in `DECISIONS.md`.
+We used an AI assistant (Claude, by Anthropic) for guidance, calculations, verification, writing and debugging scripts, and building the website. All brainstorming, ideas, decisions and conclusions are our own, and we checked the reported numbers against the code and data. We are responsible for all results. The reasoning is recorded in `DECISIONS.md`.
 
 ## Citations
 
